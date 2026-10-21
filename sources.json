@@ -1,0 +1,5 @@
+[
+ {"id":"city_hr","name":"湘潭市人社局 · 招考资讯","url":"https://xtrs.xiangtan.gov.cn/25937/index.htm","marker":"招考资讯","verified_on":"2026-10-21","verification":"实际GET 200；栏目标题及带日期公告行已核实"},
+ {"id":"county","name":"湘潭县 · 考录招聘","url":"https://www.xtx.gov.cn/6571/6606/6589/index.htm","marker":"考录招聘","verified_on":"2026-10-21","verification":"实际GET 200；栏目标题及带日期公告行已核实"},
+ {"id":"yuhu_education","name":"雨湖区教育局 · 信息公开栏目（关键词筛选）","url":"https://www.xtyh.gov.cn/2997/3008/3033/3040/3492/3796/index.htm","marker":"雨湖区","verified_on":"2026-10-21","verification":"实际GET 200；含2026年公开招聘初中优秀教师公告，并非招聘专栏"}
+]
