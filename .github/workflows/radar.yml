@@ -1,0 +1,64 @@
+name: 湘潭招聘雷达
+on:
+  workflow_dispatch:
+# 仅手动运行；没有schedule，不会每天自动执行。
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: recruitment-radar
+  cancel-in-progress: false
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      RADAR_SAVE_SNAPSHOTS: '0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 自动化测试
+        run: python -m unittest discover -s tests -v
+      - name: 恢复历史（失败则停止，禁止从空数据开始）
+        id: restore
+        run: python scripts/state.py restore
+      - name: 抓取（失败仍保存日志）
+        id: crawl
+        continue-on-error: true
+        run: python -m radar
+      - name: 持久保存公告和日志到data分支
+        id: save
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' && (steps.crawl.outcome == 'success' || steps.crawl.outcome == 'failure') }}
+        run: python scripts/state.py save
+      - name: 保存失败时提供临时恢复备份（不是长期存储）
+        if: ${{ !cancelled() && steps.save.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            data/radar.sqlite3
+            data/logs.json
+          retention-days: 30
+      - name: 配置Pages
+        if: ${{ success() && steps.save.outcome == 'success' }}
+        uses: actions/configure-pages@v5
+      - name: 上传Pages（仅静态网页）
+        if: ${{ success() && steps.save.outcome == 'success' }}
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: 发布网页
+        id: deployment
+        if: ${{ success() && steps.save.outcome == 'success' }}
+        uses: actions/deploy-pages@v4
+      - name: 明确标记本轮抓取失败
+        if: ${{ !cancelled() && steps.crawl.outcome == 'failure' }}
+        run: |
+          echo '本轮抓取存在失败；请检查网页监测日志。'
+          exit 1
