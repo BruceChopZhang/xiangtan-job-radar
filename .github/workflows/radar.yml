@@ -36,6 +36,9 @@ jobs:
         id: save
         if: ${{ !cancelled() && steps.restore.outcome == 'success' && (steps.crawl.outcome == 'success' || steps.crawl.outcome == 'failure') }}
         run: python scripts/state.py save
+        env:
+          # Independent state repo must not rely on checkout's credential layout.
+          RADAR_GITHUB_TOKEN: ${{ github.token }}
       - name: 保存失败时提供临时恢复备份（不是长期存储）
         if: ${{ !cancelled() && steps.save.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
