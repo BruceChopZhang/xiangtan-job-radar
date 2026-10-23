@@ -1,14 +1,62 @@
 """Persist public monitoring state; restoration failures must never reset history."""
 import argparse
+import base64
+import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import subprocess
+from urllib.parse import urlsplit
 
 
-def git(root, *args):
-    return subprocess.run(['git', '-C', str(root), *args], check=True,
-                          text=True, capture_output=True).stdout.strip()
+def safe_output(text):
+    """Keep Git diagnostics, but never expose tokens or Authorization headers."""
+    token = os.environ.get('RADAR_GITHUB_TOKEN', '')
+    if token:
+        encoded = base64.b64encode(f'x-access-token:{token}'.encode()).decode()
+        text = text.replace(encoded, '***').replace(token, '***')
+    text = re.sub(r'(?i)(authorization\s*:\s*(?:basic|bearer)\s+)\S+', r'\1***', text)
+    return re.sub(r'(https?://)[^/\s@]+@', r'\1***@', text)
+
+
+def git_error(result, operation):
+    return RuntimeError(safe_output(
+        f'{operation}失败（Git退出码 {result.returncode}）。不会强制覆盖历史。\n'
+        f'Git stdout:\n{result.stdout or "（空）"}\n'
+        f'Git stderr:\n{result.stderr or "（空）"}'))
+
+
+def git(root, *args, env=None):
+    result = subprocess.run(['git', '-C', str(root), *args],
+                            text=True, capture_output=True, env=env)
+    if result.returncode:
+        raise git_error(result, f'git {args[0]}')
+    return result.stdout.strip()
+
+
+def push_environment(remote):
+    """Use the job token once, for this push only; do not copy checkout config."""
+    env = os.environ.copy()
+    env['GIT_TERMINAL_PROMPT'] = '0'
+    token = env.get('RADAR_GITHUB_TOKEN', '')
+    url = urlsplit(remote)
+    if not token:
+        if env.get('GITHUB_ACTIONS') == 'true' and url.scheme in ('http', 'https'):
+            raise RuntimeError('保存步骤缺少RADAR_GITHUB_TOKEN；请同步更新radar.yml。')
+        return env  # Local tests and local Git credentials still work.
+    if url.scheme not in ('http', 'https') or not url.netloc or url.username:
+        raise RuntimeError('工作流令牌只用于无内嵌凭据的HTTP(S)远端。')
+    key = f'http.{url.scheme}://{url.netloc}/.extraheader'
+    count = int(env.get('GIT_CONFIG_COUNT', '0'))
+    # Empty extraheader resets inherited headers, including worktree credentials.
+    header = 'AUTHORIZATION: basic ' + base64.b64encode(
+        f'x-access-token:{token}'.encode()).decode()
+    for offset, value in enumerate(('', header)):
+        env[f'GIT_CONFIG_KEY_{count + offset}'] = key
+        env[f'GIT_CONFIG_VALUE_{count + offset}'] = value
+    env['GIT_CONFIG_COUNT'] = str(count + 2)
+    return env
 
 
 def validate(path):
@@ -40,7 +88,7 @@ def restore(root):
         shutil.copy2(state / 'data/radar.sqlite3', root / 'data/radar.sqlite3')
         print('已恢复公告、修订和全部运行日志。')
     else:
-        raise RuntimeError('无法检查历史分支；停止，不从空数据库开始。')
+        raise git_error(result, '检查历史分支（停止，不从空数据库开始）')
 
 
 def save(root):
@@ -59,18 +107,7 @@ def save(root):
     if git(state, 'diff', '--cached', '--name-only'):
         git(state, 'commit', '-m', '保存公告历史与监测日志')
         remote = git(root, 'remote', 'get-url', 'origin')
-        auth = subprocess.run(['git', '-C', str(root), 'config', '--get-regexp',
-                               r'http\..*\.extraheader'], text=True, capture_output=True)
-        args = []
-        if auth.returncode not in (0, 1):
-            raise RuntimeError('无法读取Git认证配置')
-        for line in auth.stdout.splitlines():
-            key, value = line.split(' ', 1)
-            args.extend(['-c', f'{key}={value}'])
-        result = subprocess.run(['git', '-C', str(state), *args, 'push', remote, 'HEAD:refs/heads/data'],
-                                text=True, capture_output=True)
-        if result.returncode:
-            raise RuntimeError('历史保存失败；检查仓库写入权限或分支冲突。不会强制覆盖。')
+        git(state, 'push', remote, 'HEAD:refs/heads/data', env=push_environment(remote))
         print('历史已保存到data分支。')
 
 
