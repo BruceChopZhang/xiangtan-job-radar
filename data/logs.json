@@ -124,5 +124,47 @@
     "error": "[网络连接异常] 运行环境网络不可达；尚未取得网页，未执行公告解析；OSError: [Errno 101] Network is unreachable",
     "seconds": 15.736,
     "snapshot": ""
+  },
+  {
+    "id": 10,
+    "run": "2026-10-25T12:29:40+08:00_36fc9f6874b6",
+    "source": "city_hr",
+    "url": "https://xtrs.xiangtan.gov.cn/25937/index.htm",
+    "kind": "栏目",
+    "visited": "2026-10-25T12:29:40+08:00",
+    "http": null,
+    "state": "网站访问失败",
+    "count": 0,
+    "error": "[网络连接异常] 运行环境网络不可达；尚未取得网页，未执行公告解析；OSError: [Errno 101] Network is unreachable",
+    "seconds": 15.024,
+    "snapshot": ""
+  },
+  {
+    "id": 11,
+    "run": "2026-10-25T12:29:40+08:00_36fc9f6874b6",
+    "source": "county",
+    "url": "https://www.xtx.gov.cn/6571/6606/6589/index.htm",
+    "kind": "栏目",
+    "visited": "2026-10-25T12:29:55+08:00",
+    "http": null,
+    "state": "网站访问失败",
+    "count": 0,
+    "error": "[网络连接异常] 运行环境网络不可达；尚未取得网页，未执行公告解析；OSError: [Errno 101] Network is unreachable",
+    "seconds": 15.035,
+    "snapshot": ""
+  },
+  {
+    "id": 12,
+    "run": "2026-10-25T12:29:40+08:00_36fc9f6874b6",
+    "source": "yuhu_education",
+    "url": "https://www.xtyh.gov.cn/2997/3008/3033/3040/3492/3796/index.htm",
+    "kind": "栏目",
+    "visited": "2026-10-25T12:30:10+08:00",
+    "http": null,
+    "state": "网站访问失败",
+    "count": 0,
+    "error": "[网络连接异常] 运行环境网络不可达；尚未取得网页，未执行公告解析；OSError: [Errno 101] Network is unreachable",
+    "seconds": 15.035,
+    "snapshot": ""
   }
 ]
