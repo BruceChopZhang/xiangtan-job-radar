@@ -34,10 +34,11 @@ jobs:
           import sys
           root = Path('publish-source/site')
           allowed = {'.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico'}
+          allowed_special = {'.nojekyll'}
           if not (root / 'index.html').is_file():
               sys.exit('拒绝发布：缺少 site/index.html')
           files = list(root.rglob('*'))
-          if any(p.is_symlink() or (p.is_file() and p.suffix.lower() not in allowed) for p in files):
+          if any(p.is_symlink() or (p.is_file() and (p.suffix.lower() not in allowed and p.name not in allowed_special)) for p in files):
               sys.exit('拒绝发布：目录中包含链接或非静态网页文件')
           if any(p.is_file() and p.stat().st_size > 15 * 1024 * 1024 for p in files):
               sys.exit('拒绝发布：存在超过 15 MB 的文件')
