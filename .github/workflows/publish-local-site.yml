@@ -1,0 +1,58 @@
+name: 发布 Windows 生成的静态网页
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: recruitment-radar-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 读取静态网页专用分支（不运行爬虫）
+        uses: actions/checkout@v4
+        with:
+          ref: pages-content
+          path: publish-source
+          persist-credentials: false
+
+      - name: 检查发布目录（禁止数据库、备份及日志）
+        shell: python
+        run: |
+          from pathlib import Path
+          import sys
+          root = Path('publish-source/site')
+          allowed = {'.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico'}
+          if not (root / 'index.html').is_file():
+              sys.exit('拒绝发布：缺少 site/index.html')
+          files = list(root.rglob('*'))
+          if any(p.is_symlink() or (p.is_file() and p.suffix.lower() not in allowed) for p in files):
+              sys.exit('拒绝发布：目录中包含链接或非静态网页文件')
+          if any(p.is_file() and p.stat().st_size > 15 * 1024 * 1024 for p in files):
+              sys.exit('拒绝发布：存在超过 15 MB 的文件')
+          if not files:
+              sys.exit('拒绝发布：目录为空')
+          print('通过：仅发布 site/ 内的静态网页文件；不读取 data 或 trial-work')
+
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传静态网页
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: publish-source/site
+
+      - name: 发布网页
+        id: deployment
+        uses: actions/deploy-pages@v4
