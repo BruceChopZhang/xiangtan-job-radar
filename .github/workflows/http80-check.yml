@@ -1,28 +1,57 @@
-name: HTTP80只读诊断
+name: 双环境网络诊断
+
 on: [workflow_dispatch]
+
 permissions: {}
 
 jobs:
   check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
+    name: 网络诊断 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
     steps:
-      - name: 检查三个官方栏目的HTTP访问
+      - name: 检查三个官网的HTTP与HTTPS
         shell: bash
         run: |
-          urls=(
-            'http://xtrs.xiangtan.gov.cn/25937/index.htm'
-            'http://www.xtx.gov.cn/6571/6606/6589/index.htm'
-            'http://www.xtyh.gov.cn/2997/3008/3033/3040/3492/3796/index.htm'
+          echo "运行系统：$RUNNER_OS"
+          curl --version
+          echo "统一使用IPv4直连；不重试，不跟随跳转。"
+
+          endpoints=(
+            'xtrs.xiangtan.gov.cn/25937/index.htm'
+            'www.xtx.gov.cn/6571/6606/6589/index.htm'
+            'www.xtyh.gov.cn/2997/3008/3033/3040/3492/3796/index.htm'
           )
 
-          for url in "${urls[@]}"; do
-            echo "检查：$url"
-            curl -q -4 --noproxy '*' \
-              --connect-timeout 5 --max-time 12 \
-              --silent --show-error \
-              --user-agent 'XiangtanRecruitmentRadar/0.1 (personal public-notice monitor)' \
-              --output /dev/null --dump-header - \
-              --write-out '\nHTTP=%{http_code} 对端=%{remote_ip} 用时=%{time_total}s\n' \
-              "$url" || true
+          for endpoint in "${endpoints[@]}"; do
+            for scheme in http https; do
+              site_url="$scheme://$endpoint"
+              echo "::group::检查 $site_url"
+
+              if curl -q -4 --noproxy '*' \
+                --connect-timeout 5 --max-time 12 \
+                --silent --show-error \
+                --user-agent 'XiangtanRecruitmentRadar/0.1 (personal public-notice monitor)' \
+                --output /dev/null \
+                --write-out '\nHTTP=%{http_code} 对端IP=%{remote_ip} DNS=%{time_namelookup}s TCP=%{time_connect}s TLS=%{time_appconnect}s 总耗时=%{time_total}s 跳转目标=%{redirect_url}\n' \
+                "$site_url"; then
+                echo "curl退出码=0（仍需检查HTTP状态码）"
+              else
+                probe_exit=$?
+                echo "curl退出码=$probe_exit"
+                echo "6=DNS失败；7=连接失败；28=超时；35=TLS握手失败；60=证书校验失败。"
+                echo "具体原因见上方原始错误。"
+              fi
+
+              echo "::endgroup::"
+            done
           done
+
+          echo "诊断结束。HTTP=000表示未取得HTTP状态。"
+          echo "任务成功只表示诊断脚本完成，不等于官网可访问。"
