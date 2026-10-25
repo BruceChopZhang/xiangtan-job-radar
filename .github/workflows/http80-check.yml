@@ -1,0 +1,28 @@
+name: HTTP80只读诊断
+on: [workflow_dispatch]
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: 检查三个官方栏目的HTTP访问
+        shell: bash
+        run: |
+          urls=(
+            'http://xtrs.xiangtan.gov.cn/25937/index.htm'
+            'http://www.xtx.gov.cn/6571/6606/6589/index.htm'
+            'http://www.xtyh.gov.cn/2997/3008/3033/3040/3492/3796/index.htm'
+          )
+
+          for url in "${urls[@]}"; do
+            echo "检查：$url"
+            curl -q -4 --noproxy '*' \
+              --connect-timeout 5 --max-time 12 \
+              --silent --show-error \
+              --user-agent 'XiangtanRecruitmentRadar/0.1 (personal public-notice monitor)' \
+              --output /dev/null --dump-header - \
+              --write-out '\nHTTP=%{http_code} 对端=%{remote_ip} 用时=%{time_total}s\n' \
+              "$url" || true
+          done
